@@ -3,9 +3,9 @@
 const mongoose = require('mongoose');
 
 const folderSchema = new mongoose.Schema({
-  name: { type: String, unique: true },
+  name: { type: String, unique: true }
 
-  created: { type: Date, default: Date.now }
+  // created: { type: Date, default: Date.now }
 
 });
 

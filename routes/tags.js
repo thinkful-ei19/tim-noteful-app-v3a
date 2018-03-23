@@ -5,28 +5,20 @@ const router = express.Router();
 
 const mongoose = require('mongoose');
 
+const Tag = require('../models/tag');
 const Note = require('../models/note');
 
-/* ========== GET/READ ALL ITEMS ========== */
-router.get('/notes', (req, res, next) => {
-  const { searchTerm, folderId, tagId } = req.query;
-
+router.get('/tags', (req, res, next) => {
+  const { searchTerm } = req.query;
+  
   let filter = {};
-
+  
   if (searchTerm) {
     const re = new RegExp(searchTerm, 'i');
     filter.title = { $regex: re };
   }
-  if (folderId) {
-    filter.folderId = folderId;
-  }  
-
-  if (tagId) {
-    filter.tagId = tagId;
-  }  
-
-  Note.find(filter)
-    .populate('tags')
+  
+  Tag.find(filter)
     .sort('created')
     .then(results => {
       res.json(results);
@@ -36,17 +28,16 @@ router.get('/notes', (req, res, next) => {
     });
 });
 
-/* ========== GET/READ A SINGLE ITEM ========== */
-router.get('/notes/:id', (req, res, next) => {
-  const { id } = req.params;
-
+router.get('/tags/:id' , (req, res, next) => {
+  const {id} = req.params;
+  
   if (!mongoose.Types.ObjectId.isValid(id)) {
     const err = new Error('The `id` is not valid');
     err.status = 400;
     return next(err);
   }
-
-  Note.findById(id)
+  
+  Tag.findById(id)
     .then(result => {
       if (result) {
         res.json(result);
@@ -59,50 +50,52 @@ router.get('/notes/:id', (req, res, next) => {
     });
 });
 
-/* ========== POST/CREATE AN ITEM ========== */
-router.post('/notes', (req, res, next) => {
-  const { title, content, folderId } = req.body;
-
+router.post('/tags', (req, res, next) => {
+  const { name } = req.body;
+    
   /***** Never trust users - validate input *****/
-  if (!title) {
-    const err = new Error('Missing `title` in request body');
+  if (!name) {
+    const err = new Error('Missing `name` in request body');
     err.status = 400;
     return next(err);
   }
-
-  const newItem = { title, content, folderId };
-
-  Note.create(newItem)
+  
+  const newTag = {name};
+    
+  Tag.create(newTag)
     .then(result => {
       res.location(`${req.originalUrl}/${result.id}`).status(201).json(result);
     })
     .catch(err => {
+      if (err.code === 11000) {
+        err = new Error('The Tag name already exists');
+        err.status = 400;
+      }
       next(err);
     });
 });
 
-/* ========== PUT/UPDATE A SINGLE ITEM ========== */
-router.put('/notes/:id', (req, res, next) => {
+router.put('/tags/:id', (req, res, next) => {
   const { id } = req.params;
-  const { title, content, folderId } = req.body;
-
+  const {name} = req.body;
+    
   /***** Never trust users - validate input *****/
-  if (!title) {
-    const err = new Error('Missing `title` in request body');
+  if (!name) {
+    const err = new Error('Missing `name` in request body');
     err.status = 400;
     return next(err);
   }
-
+    
   if (!mongoose.Types.ObjectId.isValid(id)) {
     const err = new Error('The `id` is not valid');
     err.status = 400;
     return next(err);
   }
-
-  const updateItem = { title, content };
+    
+  const updateTag = { name };
   const options = { new: true };
-
-  Note.findByIdAndUpdate(id, updateItem, options)
+    
+  Tag.findByIdAndUpdate(id, updateTag, options)
     .then(result => {
       if (result) {
         res.json(result);
@@ -110,16 +103,18 @@ router.put('/notes/:id', (req, res, next) => {
         next();
       }
     })
-    .catch(err => {
-      next(err);
+    .catch(err => {if (err.code === 11000) {
+      err = new Error('The folder name already exists');
+      err.status = 400;
+    }
+    next(err);
     });
 });
 
-/* ========== DELETE/REMOVE A SINGLE ITEM ========== */
-router.delete('/notes/:id', (req, res, next) => {
+router.delete('/tags/:id', (req, res, next) => {
   const { id } = req.params;
-
-  Note.findByIdAndRemove(id)
+    
+  Note.findByIdAndRemove(id, {$pull: {'tags': id }} )
     .then(() => {
       res.status(204).end();
     })
@@ -127,5 +122,6 @@ router.delete('/notes/:id', (req, res, next) => {
       next(err);
     });
 });
+
 
 module.exports = router;
